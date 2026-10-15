@@ -37,6 +37,11 @@ UPSTREAMS = [
         "scope": "cn",
     },
     {
+        "name": "zhzb",
+        "url": "https://tv6.tv1288.xyz",
+        "scope": "cn",
+    },
+    {
         "name": "fanmingming-index",
         "url": "https://cdn.jsdelivr.net/gh/fanmingming/live@main/tv/m3u/index.m3u",
         "scope": "cn",
