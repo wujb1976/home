@@ -1,8 +1,9 @@
 name: 更新直播源并发布
-# 每6小时自动跑；支持手动触发
+
+# 每天 UTC 00:00（北京时间 08:00）自动跑一次；也支持手动触发
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 */6 * * *"   # 每 6 小时一次，保证"实时更新"体感
   workflow_dispatch:
 
 permissions:
@@ -12,7 +13,7 @@ permissions:
 
 concurrency:
   group: update-playlist
-  cancel-in-progress: true  # 新任务触发时取消正在运行的旧任务，避免冲突
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -23,35 +24,15 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # 拉取完整历史，用于git commit
-          # 如果使用PAT推送，添加 token: ${{ secrets.GH_PAT }}
 
       - name: 配置 Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: 运行聚合脚本生成直播源
+      - name: 运行聚合脚本
         run: python aggregate.py
 
-      # ========== 先提交文件回仓库 ==========
-      - name: 提交更新的直播源文件
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add out/index.m3u out/summary.json out/UNSUPPORTED.md 2>/dev/null || true
-          # 没有变更直接退出，不提交
-          if git diff --cached --quiet; then
-            echo "文件无变化，跳过提交"
-            exit 0
-          fi
-          git commit -m "chore: update playlist $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push
-        # 【重点】原生GITHUB_TOKEN无法push！
-        # 如果你要启用git push，checkout必须配置token: ${{ secrets.GH_PAT }}，在仓库Secrets添加个人访问令牌
-
-      # ========== 再部署 Pages（使用本次脚本生成的新文件） ==========
       - name: 上传 Pages 产物
         uses: actions/upload-pages-artifact@v3
         with:
@@ -60,3 +41,11 @@ jobs:
       - name: 部署到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: 回写 summary 到仓库（可选，便于在 README 展示）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add out/index.m3u out/summary.json out/UNSUPPORTED.md 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "chore: update playlist $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
